@@ -20,6 +20,8 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup Condition="'$(MSBuildProjectName)'=='cchp-api-dll'">
+    <ClCompile Remove="pch.cpp" />
+    <ClInclude Remove="pch.h" />
     <ClCompile Include="$(MSBuildProjectDirectory)\abi.cpp" />
     <ClCompile Include="$(MSBuildProjectDirectory)\client.cpp" />
     <ClCompile Include="$(MSBuildProjectDirectory)\core.cpp" />

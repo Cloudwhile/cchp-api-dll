@@ -1,0 +1,20 @@
+name: Windows SDK
+on: [push, pull_request]
+jobs:
+  sdk:
+    runs-on: windows-2025-vs2026
+    strategy:
+      fail-fast: false
+      matrix:
+        architecture: [x64, x86]
+        mode: [Release, Analyze, Asan]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and verify
+        shell: pwsh
+        run: ./scripts/build.ps1 -Architecture ${{ matrix.architecture }} -Mode ${{ matrix.mode }} -Package:('${{ matrix.mode }}' -eq 'Release')
+      - uses: actions/upload-artifact@v4
+        if: matrix.mode == 'Release'
+        with:
+          name: cchp-${{ matrix.architecture }}
+          path: dist/cchp-${{ matrix.architecture }}.zip

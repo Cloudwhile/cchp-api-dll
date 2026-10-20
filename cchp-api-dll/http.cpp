@@ -151,7 +151,7 @@ Response Transport::open(const std::string& method, const std::string& path, con
 }
 std::string Response::read_all() {
     std::string text;
-    std::array<char, 16384> buffer{};
+    std::array<char, 8192> buffer{};
     for (;;) {
         DWORD read = 0;
         checked(WinHttpReadData(request->get(), buffer.data(), static_cast<DWORD>(buffer.size()), &read));

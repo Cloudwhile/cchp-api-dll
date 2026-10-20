@@ -27,7 +27,8 @@ CCHP_API cchp_client CCHP_CALL cchp_client_create(const char* config_json);
 CCHP_API void CCHP_CALL cchp_client_destroy(cchp_client client);
 /* query_json: 对象，标量参数将自动 URL 编码；NULL 表示无参数。
  * body_json: 任意有效 JSON，NULL 表示无请求体。失败返回 NULL。
- * path 必须为 /api/ 下的相对路径，不能带查询串。GET 最多重试 3 次。 */
+ * path 必须为 /api/ 下的相对路径，不能带查询串。GET 最多重试 3 次。
+ * spec-only: /api/account/orgs 及其组织管理子路由，实站可能返回 404。 */
 CCHP_API char* CCHP_CALL cchp_request(cchp_client client, const char* method,
     const char* path, const char* query_json, const char* body_json);
 CCHP_API void CCHP_CALL cchp_string_free(char* string);

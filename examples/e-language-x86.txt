@@ -1,0 +1,61 @@
+易语言 x86 DLL 声明参考（UTF-8 文本）
+
+以下所有地址/句柄/订阅 ID 均为 32 位整数。仅适用于 x86 cchp.dll。
+所有输入必须在宿主转换为 UTF-8 字节集并补一个 0；传入字节集地址。
+所有返回文本均为 UTF-8 指针，应复制到宿主字节集后再解码。
+DLL 返回指针不可用易语言释放内存命令释放，必须调用 cchp_string_free。
+这些声明的返回值故意采用整数指针，避免自动 ANSI 字符串转换和所有权混淆。
+将 DLL 放在宿主 exe 同目录。易语言 IDE 中 DLL 命令参数使用整数型。
+
+.版本 2
+
+.DLL命令 cchp_client_create, 整数型, "cchp.dll", "cchp_client_create"
+    .参数 配置UTF8地址, 整数型
+.DLL命令 cchp_client_destroy, , "cchp.dll", "cchp_client_destroy"
+    .参数 客户端, 整数型
+.DLL命令 cchp_request, 整数型, "cchp.dll", "cchp_request"
+    .参数 客户端, 整数型
+    .参数 方法UTF8地址, 整数型
+    .参数 路径UTF8地址, 整数型
+    .参数 查询JSON地址, 整数型
+    .参数 正文JSON地址, 整数型
+.DLL命令 cchp_get_me, 整数型, "cchp.dll", "cchp_get_me"
+    .参数 客户端, 整数型
+.DLL命令 cchp_usage_logs, 整数型, "cchp.dll", "cchp_usage_logs"
+    .参数 客户端, 整数型
+    .参数 查询JSON地址, 整数型
+.DLL命令 cchp_usage_summary, 整数型, "cchp.dll", "cchp_usage_summary"
+    .参数 客户端, 整数型
+.DLL命令 cchp_usage_by_model, 整数型, "cchp.dll", "cchp_usage_by_model"
+    .参数 客户端, 整数型
+    .参数 查询JSON地址, 整数型
+.DLL命令 cchp_usage_timeseries, 整数型, "cchp.dll", "cchp_usage_timeseries"
+    .参数 客户端, 整数型
+    .参数 查询JSON地址, 整数型
+.DLL命令 cchp_wallet_overview, 整数型, "cchp.dll", "cchp_wallet_overview"
+    .参数 客户端, 整数型
+.DLL命令 cchp_quota_effective, 整数型, "cchp.dll", "cchp_quota_effective"
+    .参数 客户端, 整数型
+    .参数 查询JSON地址, 整数型
+.DLL命令 cchp_status_snapshot, 整数型, "cchp.dll", "cchp_status_snapshot"
+    .参数 客户端, 整数型
+.DLL命令 cchp_subscribe, 整数型, "cchp.dll", "cchp_subscribe"
+    .参数 客户端, 整数型
+    .参数 流名称UTF8地址, 整数型
+    .参数 类型列表UTF8地址, 整数型
+    .参数 回调地址, 整数型
+    .参数 用户数据, 整数型
+.DLL命令 cchp_unsubscribe, , "cchp.dll", "cchp_unsubscribe"
+    .参数 客户端, 整数型
+    .参数 订阅ID, 整数型
+.DLL命令 cchp_string_free, , "cchp.dll", "cchp_string_free"
+    .参数 DLL字符串地址, 整数型
+.DLL命令 cchp_last_error, 整数型, "cchp.dll", "cchp_last_error"
+
+常量：空地址=0，订阅失败=0，每美元单位数=10000000000（双精度常量）。
+金额在 JSON 中使用 64 位整数；不要先转换成易语言 32 位整数。
+回调约定：stdcall，两个整数型参数（事件UTF8地址、用户数据），无返回值。
+回调内复制事件后投递给主线程；禁止直接更新 UI。
+禁止在任何 SDK 回调内调用 subscribe/unsubscribe/destroy（错误 -8）。
+由主线程取消订阅、销毁客户端后，才可释放用户数据或卸载 DLL。
+last_error 地址无需释放，必须在同线程下一次 SDK 调用前复制。
