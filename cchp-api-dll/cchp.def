@@ -5,3 +5,11 @@ EXPORTS
   cchp_string_free
   cchp_last_error
   cchp_request
+  cchp_get_me
+  cchp_usage_logs
+  cchp_usage_summary
+  cchp_usage_by_model
+  cchp_usage_timeseries
+  cchp_wallet_overview
+  cchp_quota_effective
+  cchp_status_snapshot

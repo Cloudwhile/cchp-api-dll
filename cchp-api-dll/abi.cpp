@@ -79,6 +79,44 @@ char* CCHP_CALL cchp_request(cchp_client client, const char* method, const char*
         return allocated(get_client(client)->request(method, path, query, body_json ? &body : nullptr));
     } catch (...) { caught_error(); return nullptr; }
 }
+char* CCHP_CALL cchp_get_me(cchp_client client) {
+    try { clear_error(); return allocated(get_client(client)->request("GET", "/api/account/me")); }
+    catch (...) { caught_error(); return nullptr; }
+}
+char* CCHP_CALL cchp_usage_logs(cchp_client client, const char* query_json) {
+    try { clear_error(); return allocated(get_client(client)->usage_logs(cchp::parse_object(query_json, true))); }
+    catch (...) { caught_error(); return nullptr; }
+}
+char* CCHP_CALL cchp_usage_summary(cchp_client client) {
+    try { clear_error(); return allocated(get_client(client)->request("GET", "/api/account/usage/summary")); }
+    catch (...) { caught_error(); return nullptr; }
+}
+char* CCHP_CALL cchp_usage_by_model(cchp_client client, const char* query_json) {
+    try { clear_error(); return allocated(get_client(client)->request("GET", "/api/account/usage/by-model", cchp::parse_object(query_json, true))); }
+    catch (...) { caught_error(); return nullptr; }
+}
+char* CCHP_CALL cchp_usage_timeseries(cchp_client client, const char* query_json) {
+    try { clear_error(); return allocated(get_client(client)->request("GET", "/api/account/usage/timeseries", cchp::parse_object(query_json, true))); }
+    catch (...) { caught_error(); return nullptr; }
+}
+char* CCHP_CALL cchp_wallet_overview(cchp_client client) {
+    try { clear_error(); return allocated(get_client(client)->request("GET", "/api/account/wallet")); }
+    catch (...) { caught_error(); return nullptr; }
+}
+char* CCHP_CALL cchp_quota_effective(cchp_client client, const char* query_json) {
+    try {
+        clear_error();
+        const auto query = cchp::parse_object(query_json);
+        const auto scope = cchp::required_string(query, "scopeType");
+        cchp::required_string(query, "scopeId");
+        if (scope != "user" && scope != "org" && scope != "key") throw cchp::Error(0, -1, "scopeType must be user, org or key");
+        return allocated(get_client(client)->request("GET", "/api/account/quota/effective", query));
+    } catch (...) { caught_error(); return nullptr; }
+}
+char* CCHP_CALL cchp_status_snapshot(cchp_client client) {
+    try { clear_error(); return allocated(get_client(client)->snapshot()); }
+    catch (...) { caught_error(); return nullptr; }
+}
 const char* CCHP_CALL cchp_last_error(void) {
     try { return last_error; }
     catch (...) { return "{\"status\":0,\"code\":-2,\"message\":\"SDK failure\"}"; }

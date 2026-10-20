@@ -31,6 +31,18 @@ CCHP_API void CCHP_CALL cchp_client_destroy(cchp_client client);
 CCHP_API char* CCHP_CALL cchp_request(cchp_client client, const char* method,
     const char* path, const char* query_json, const char* body_json);
 CCHP_API void CCHP_CALL cchp_string_free(char* string);
+/* query_json 为 UTF-8 JSON 对象；NULL 表示默认参数。
+ * quota_effective 必须提供 scopeType=user|org|key 与 scopeId。
+ * logs 的原始 page 包裹与未知字段保持不变，limit 为 1..200。
+ */
+CCHP_API char* CCHP_CALL cchp_get_me(cchp_client client);
+CCHP_API char* CCHP_CALL cchp_usage_logs(cchp_client client, const char* query_json);
+CCHP_API char* CCHP_CALL cchp_usage_summary(cchp_client client);
+CCHP_API char* CCHP_CALL cchp_usage_by_model(cchp_client client, const char* query_json);
+CCHP_API char* CCHP_CALL cchp_usage_timeseries(cchp_client client, const char* query_json);
+CCHP_API char* CCHP_CALL cchp_wallet_overview(cchp_client client);
+CCHP_API char* CCHP_CALL cchp_quota_effective(cchp_client client, const char* query_json);
+CCHP_API char* CCHP_CALL cchp_status_snapshot(cchp_client client);
 /* 线程本地错误 JSON：{status,code,message}。无需释放；有效至同一线程
  * 下一次 SDK 调用（重复调用 last_error 除外）。成功调用清除旧错误。 */
 CCHP_API const char* CCHP_CALL cchp_last_error(void);

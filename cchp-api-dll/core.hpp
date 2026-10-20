@@ -27,6 +27,7 @@ struct Config {
 };
 class Transport;
 struct Response;
+std::int64_t utc_now_ms();
 class Client {
     std::unique_ptr<Transport> transport_;
     std::recursive_mutex auth_mutex_;
@@ -42,5 +43,7 @@ public:
     explicit Client(Config value);
     ~Client();
     Json request(const std::string& method, const std::string& path, const Json& query = Json::object(), const Json* body = nullptr);
+    Json usage_logs(const Json& query);
+    Json snapshot(std::int64_t now = utc_now_ms());
 };
 }

@@ -1,4 +1,6 @@
 #include "mock_server.hpp"
+#include "usage.hpp"
+#include "http.hpp"
 #include <array>
 #include <algorithm>
 #include <sstream>
@@ -19,6 +21,7 @@ std::string lower(std::string value) {
 }
 }
 MockServer::MockServer() {
+    now = cchp::utc_now_ms();
     WSADATA data{};
     if (WSAStartup(MAKEWORD(2, 2), &data)) throw std::runtime_error("WSAStartup failed");
     listener_ = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
@@ -117,6 +120,34 @@ void MockServer::serve(SOCKET socket) {
     } else if (path == "/api/account/me") {
         result = {{"user", {{"id", "fixture-user"}, {"displayName", "测试用户"}}}, {"csrf_token", "session-csrf"},
             {"memberships", Json::array({{{"organization", {{"id", "fixture-org"}}}}})}};
+    } else if (path == "/api/account/usage/logs") {
+        const bool second_page = target.find("cursor=") != std::string::npos;
+        const bool fallback = target.find(cchp::url_encode(cchp::format_time(now - 30LL * 86400000))) != std::string::npos;
+        Json items = Json::array();
+        if (usage_mode == 3) { status = 403; result = {{"code", 10004}}; }
+        else {
+            if (usage_mode == 0 || usage_mode == 4) {
+                if (!second_page) items.push_back({{"id", "pending"}, {"createdAt", cchp::format_time(now - 1000)},
+                    {"completedAt", nullptr}, {"requestedModel", "gpt-6.1-sol"}, {"finalModel", nullptr},
+                    {"inputTokens", nullptr}, {"outputTokens", nullptr}, {"httpStatus", nullptr}, {"futureField", true}});
+                items.push_back({{"id", second_page ? "complete-2" : "complete-1"},
+                    {"createdAt", cchp::format_time(now - 180000)}, {"finalModel", "previous-model"},
+                    {"inputTokens", second_page ? 600 : 300}, {"outputTokens", second_page ? 60 : 30}});
+            } else if (usage_mode == 1 && fallback) {
+                items.push_back({{"id", "old"}, {"createdAt", cchp::format_time(now - 86400000)},
+                    {"requestedModel", "last-model"}, {"inputTokens", nullptr}, {"outputTokens", nullptr}});
+            }
+            const bool more = usage_mode == 4 || (usage_mode == 0 && !second_page);
+            result = {{"$schema", "fixture-only"}, {"effectiveScope", "organization"},
+                {"page", {{"items", items}, {"nextCursor", more ? Json("a+b /中文") : Json(nullptr)}, {"total", 3}}}};
+        }
+    } else if (path == "/api/account/usage/summary") {
+        result = {{"today", {{"costUnits", 1400000000LL}}}, {"unknownFutureWindow", 42}};
+    } else if (path == "/api/account/wallet") {
+        result = {{"balanceUnits", 153017766000LL}, {"packages", Json::array()}};
+    } else if (path == "/api/account/usage/by-model" || path == "/api/account/usage/timeseries" ||
+               path == "/api/account/quota/effective") {
+        result = {{"fixture", true}, {"target", target}};
     } else if (path == "/api/test/headers") {
         result = {{"hasBearer", headers["authorization"] == "Bearer test-only"},
             {"org", headers["x-cch-organization"]}, {"csrf", headers["x-csrf-token"]},
