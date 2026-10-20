@@ -1,0 +1,7 @@
+LIBRARY cchp
+EXPORTS
+  cchp_client_create
+  cchp_client_destroy
+  cchp_string_free
+  cchp_last_error
+  cchp_request

@@ -1,0 +1,32 @@
+<Project>
+  <!-- Integrate SDK sources without overwriting local project settings. -->
+  <ItemDefinitionGroup Condition="'$(MSBuildProjectName)'=='cchp-api-dll'">
+    <ClCompile>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <WarningLevel>Level4</WarningLevel>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <ExceptionHandling>Async</ExceptionHandling>
+      <BasicRuntimeChecks>Default</BasicRuntimeChecks>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalIncludeDirectories>$(MSBuildThisFileDirectory)include;$(MSBuildThisFileDirectory)third_party;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>CCHP_BUILD;NOMINMAX;WIN32_LEAN_AND_MEAN;_WIN32_WINNT=0x0A00;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <EnablePREfast Condition="'$(CchpAnalyze)'=='true'">true</EnablePREfast>
+      <EnableASAN Condition="'$(CchpAsan)'=='true'">true</EnableASAN>
+    </ClCompile>
+    <Link>
+      <ModuleDefinitionFile>$(MSBuildThisFileDirectory)cchp-api-dll\cchp.def</ModuleDefinitionFile>
+      <AdditionalDependencies>winhttp.lib;rpcrt4.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup Condition="'$(MSBuildProjectName)'=='cchp-api-dll'">
+    <ClCompile Include="$(MSBuildProjectDirectory)\abi.cpp" />
+    <ClCompile Include="$(MSBuildProjectDirectory)\client.cpp" />
+    <ClCompile Include="$(MSBuildProjectDirectory)\core.cpp" />
+    <ClCompile Include="$(MSBuildProjectDirectory)\http.cpp" />
+    <ClInclude Include="$(MSBuildProjectDirectory)\core.hpp" />
+    <ClInclude Include="$(MSBuildProjectDirectory)\http.hpp" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)include\cchp.h" />
+    <None Include="$(MSBuildProjectDirectory)\cchp.def" />
+  </ItemGroup>
+</Project>
