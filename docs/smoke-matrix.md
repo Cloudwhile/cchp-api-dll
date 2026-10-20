@@ -8,7 +8,7 @@
 | GET /api/account/me | 已实测，含 CSRF/组织 | Cookie、密码、MFA、Bearer | get_me |
 | GET /api/admin/whoami | 清单内，未单独给出实测结果 | 通用路径与鉴权测试 | request |
 | GET /api/account/permissions/summary | 已实测，无组织时权限为空 | 通用路径与鉴权测试 | request |
-| GET /api/account/usage/logs | 已实测，page.items、未完成行可空 | 分页、中文游标、null、未知字段 | usage_logs |
+| GET /api/account/usage/logs | 已实测，page.items、未完成行可空 | startedAt、小数秒、分页、中文游标、null、未知字段 | usage_logs |
 | GET /api/account/usage/summary | 已实测，组织缺失为 403/10004 | today、units、403 透传 | usage_summary |
 | GET /api/account/usage/by-model | 本期接口，未单独给出实测结果 | 路径与 query | usage_by_model |
 | GET /api/account/usage/timeseries | 本期接口，未单独给出实测结果 | 路径与 query | usage_timeseries |

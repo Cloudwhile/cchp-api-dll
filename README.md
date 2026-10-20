@@ -178,7 +178,7 @@ if (response) {
 | `todayCostUsd` | `summary.today.costUnits / 10^10` |
 | `balanceUsd` | `wallet.balanceUnits / 10^10` |
 
-模型优先使用 finalModel，缺失时使用 requestedModel。快照遍历窗口内全部游标页，按日志 ID 去重。金额使用 64 位整数解析后换算为美元，例如 `153017766000` units 对应 `$15.3017766`。查询失败会返回错误，403 不转换为空数据。
+日志以 `startedAt` 作为请求开始时间，支持 RFC3339 小数秒；`lastActiveAt` 保留原始时间字符串。模型优先使用 finalModel，缺失时使用 requestedModel。快照遍历窗口内全部游标页，按日志 ID 去重。金额使用 64 位整数解析后换算为美元，例如 `153017766000` units 对应 `$15.3017766`。查询失败会返回错误，403 不转换为空数据。
 
 ### SSE
 

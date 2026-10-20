@@ -8,6 +8,17 @@ int main() {
     const auto instant = parse_time("2026-10-20T15:59:59.123Z");
     CHECK(parse_time("2026-10-20T23:59:59.123+08:00") == instant);
     CHECK(format_time(instant) == "2026-10-20T15:59:59.123Z");
+    CHECK(parse_time("2026-10-20T15:59:59.123889Z") == instant);
+    CHECK(parse_time("2026-10-20T15:59:59.123889026Z") == instant);
+    const auto running = UsageRow::parse({{"startedAt", "2026-10-20T15:59:59.123889Z"},
+        {"status", "in_progress"}, {"completedAt", nullptr}, {"httpStatus", nullptr},
+        {"requestedModel", "requested-model"}, {"finalModel", nullptr}, {"inputTokens", 0}, {"outputTokens", 0}});
+    CHECK(running.started_ms == instant && running.started_at == "2026-10-20T15:59:59.123889Z");
+    CHECK(running.model == "requested-model" && !running.completed_at && !running.http_status);
+    for (const auto& value : {Json(nullptr), Json(""), Json(123), Json("invalid-time")}) {
+        try { UsageRow::parse({{"startedAt", value}}); return 1; } catch (const Error& e) { CHECK(e.code == -4); }
+    }
+    try { UsageRow::parse(Json::object()); return 1; } catch (const Error& e) { CHECK(e.code == -4); }
     try { parse_time("2026-02-30T15:59:59Z"); return 1; } catch (const Error&) {}
     try { validate_usage_page(Json::array()); return 1; } catch (const Error&) {}
     MockServer server;
@@ -16,10 +27,12 @@ int main() {
     auto logs = client.usage_logs({{"limit", 200}});
     CHECK(logs["page"]["items"][0]["completedAt"].is_null());
     CHECK(logs["page"]["items"][0]["futureField"] == true);
+    CHECK(logs["page"]["items"][0]["status"] == "in_progress");
     const auto before = server.count("GET /api/account/usage/logs");
     auto snap = client.snapshot(server.now);
     CHECK(server.count("GET /api/account/usage/logs") == before + 2);
     CHECK(snap["nowActiveModel"] == "gpt-6.1-sol" && snap["lastModel"] == "gpt-6.1-sol");
+    CHECK(snap["lastActiveAt"] == logs["page"]["items"][0]["startedAt"]);
     CHECK(snap["inputTokPerSec"] == 3.0 && snap["outputTokPerSec"] == 0.3);
     CHECK(std::abs(snap["balanceUsd"].get<double>() - 15.3017766) < 1e-9);
     CHECK(std::abs(snap["todayCostUsd"].get<double>() - 0.14) < 1e-12);

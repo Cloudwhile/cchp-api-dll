@@ -92,8 +92,10 @@ std::int64_t integer_units(const Json& value) {
 UsageRow UsageRow::parse(const Json& row) {
     if (!row.is_object()) throw Error(0, -4, "Usage row must be an object");
     UsageRow result;
-    result.created_at = required_string(row, "createdAt");
-    result.created_ms = parse_time(result.created_at);
+    const auto started = nullable_string(row, "startedAt");
+    if (!started || started->empty()) throw Error(0, -4, "Usage row requires a non-empty startedAt timestamp");
+    result.started_at = *started;
+    result.started_ms = parse_time(result.started_at);
     result.model = nullable_string(row, "finalModel");
     if (!result.model || result.model->empty()) result.model = nullable_string(row, "requestedModel");
     result.completed_at = nullable_string(row, "completedAt");
@@ -139,9 +141,9 @@ Json Client::snapshot(std::int64_t now) {
             const auto response = usage_logs(query);
             for (const auto& value : response["page"]["items"]) {
                 const auto row = UsageRow::parse(value);
-                if (row.created_ms < start || row.created_ms > now) continue;
+                if (row.started_ms < start || row.started_ms > now) continue;
                 if (value.contains("id") && value["id"].is_string() && !row_ids.insert(value["id"]).second) continue;
-                if (!latest || row.created_ms > latest->created_ms) latest = row;
+                if (!latest || row.started_ms > latest->started_ms) latest = row;
                 if (count_tokens) { add_tokens(input, row.input_tokens); add_tokens(output, row.output_tokens); }
             }
             const auto& cursor = response["page"]["nextCursor"];
@@ -163,8 +165,8 @@ Json Client::snapshot(std::int64_t now) {
         {"todayCostUsd", static_cast<double>(cost) / 1e10}, {"balanceUsd", static_cast<double>(balance) / 1e10}};
     if (latest) {
         result["lastModel"] = latest->model ? Json(*latest->model) : Json(nullptr);
-        result["lastActiveAt"] = latest->created_at;
-        if (now - latest->created_ms <= 120000) result["nowActiveModel"] = result["lastModel"];
+        result["lastActiveAt"] = latest->started_at;
+        if (now - latest->started_ms <= 120000) result["nowActiveModel"] = result["lastModel"];
     }
     return result;
 }

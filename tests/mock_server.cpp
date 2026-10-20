@@ -149,18 +149,20 @@ void MockServer::serve(SOCKET socket) {
         if (usage_mode == 3) { status = 403; result = {{"code", 10004}}; }
         else {
             if (usage_mode == 0 || usage_mode == 4) {
-                if (!second_page) items.push_back({{"id", "pending"}, {"createdAt", cchp::format_time(now - 1000)},
+                auto started = cchp::format_time(now - 1000);
+                started.insert(started.size() - 1, "889");
+                if (!second_page) items.push_back({{"id", "pending"}, {"startedAt", started}, {"status", "in_progress"},
                     {"completedAt", nullptr}, {"requestedModel", "gpt-6.1-sol"}, {"finalModel", nullptr},
                     {"inputTokens", nullptr}, {"outputTokens", nullptr}, {"httpStatus", nullptr}, {"futureField", true}});
                 items.push_back({{"id", second_page ? "complete-2" : "complete-1"},
-                    {"createdAt", cchp::format_time(now - 180000)}, {"finalModel", "previous-model"},
+                    {"startedAt", cchp::format_time(now - 180000)}, {"finalModel", "previous-model"},
                     {"inputTokens", second_page ? 600 : 300}, {"outputTokens", second_page ? 60 : 30}});
             } else if (usage_mode == 1 && fallback) {
-                items.push_back({{"id", "old"}, {"createdAt", cchp::format_time(now - 86400000)},
+                items.push_back({{"id", "old"}, {"startedAt", cchp::format_time(now - 86400000)},
                     {"requestedModel", "last-model"}, {"inputTokens", nullptr}, {"outputTokens", nullptr}});
             }
             const bool more = usage_mode == 4 || (usage_mode == 0 && !second_page);
-            result = {{"$schema", "fixture-only"}, {"effectiveScope", "organization"},
+            result = {{"$schema", "fixture-only"}, {"effectiveScope", {{"type", "user"}, {"id", "fixture-user"}, {"source", "default"}}},
                 {"page", {{"items", items}, {"nextCursor", more ? Json("a+b /中文") : Json(nullptr)}, {"total", 3}}}};
         }
     } else if (path == "/api/account/usage/summary") {
