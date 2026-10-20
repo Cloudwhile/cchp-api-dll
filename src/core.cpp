@@ -56,6 +56,12 @@ Config Config::parse(const char* text) {
     else if (result.auth_type == "password") {
         result.email = required_string(auth, "email");
         result.password = required_string(auth, "password");
+        if (auth.contains("mfa")) {
+            if (!auth["mfa"].is_object()) throw Error(0, -1, "mfa must be an object");
+            result.mfa_method = required_string(auth["mfa"], "method");
+            result.mfa_code = required_string(auth["mfa"], "code");
+            if (result.mfa_method != "totp" && result.mfa_method != "recovery_code") throw Error(0, -1, "Unsupported MFA method");
+        }
     } else throw Error(0, -1, "Unknown auth type");
     if (root.contains("timeout_ms")) {
         if (!root["timeout_ms"].is_number_integer()) throw Error(0, -1, "Invalid timeout_ms");

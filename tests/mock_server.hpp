@@ -1,0 +1,24 @@
+#pragma once
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#include "core.hpp"
+#include <atomic>
+#include <functional>
+#include <map>
+#include <thread>
+
+class MockServer {
+    SOCKET listener_ = INVALID_SOCKET;
+    std::thread acceptor_;
+    std::vector<std::thread> workers_;
+    std::mutex mutex_;
+    std::map<std::string, int> counts_;
+    std::atomic<bool> stopping_{false};
+    unsigned short port_ = 0;
+    void serve(SOCKET socket);
+public:
+    MockServer();
+    ~MockServer();
+    std::string url() const;
+    int count(const std::string& route);
+};

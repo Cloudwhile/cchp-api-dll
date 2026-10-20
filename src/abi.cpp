@@ -8,6 +8,18 @@ namespace {
 thread_local char last_error[8192] = "{}";
 std::mutex clients_mutex;
 std::unordered_map<void*, std::shared_ptr<cchp::Client>> clients;
+std::shared_ptr<cchp::Client> get_client(cchp_client handle) {
+    std::lock_guard<std::mutex> lock(clients_mutex);
+    const auto it = clients.find(handle);
+    if (it == clients.end()) throw cchp::Error(0, -1, "Invalid client handle");
+    return it->second;
+}
+char* allocated(const cchp::Json& json) {
+    const auto text = json.dump();
+    auto result = std::make_unique<char[]>(text.size() + 1);
+    std::memcpy(result.get(), text.c_str(), text.size() + 1);
+    return result.release();
+}
 void clear_error() noexcept { std::memcpy(last_error, "{}", 3); }
 void set_error(int status, std::int64_t code, const char* message) noexcept {
     try {
@@ -52,6 +64,20 @@ void CCHP_CALL cchp_client_destroy(cchp_client client) {
 void CCHP_CALL cchp_string_free(char* string) {
     try { clear_error(); delete[] string; }
     catch (...) { caught_error(); }
+}
+char* CCHP_CALL cchp_request(cchp_client client, const char* method, const char* path,
+                          const char* query_json, const char* body_json) {
+    try {
+        clear_error();
+        if (!method || !path) throw cchp::Error(0, -1, "method and path are required");
+        const auto query = cchp::parse_object(query_json, true);
+        cchp::Json body;
+        if (body_json) {
+            body = cchp::Json::parse(body_json, nullptr, false);
+            if (body.is_discarded()) throw cchp::Error(0, -1, "Invalid body JSON");
+        }
+        return allocated(get_client(client)->request(method, path, query, body_json ? &body : nullptr));
+    } catch (...) { caught_error(); return nullptr; }
 }
 const char* CCHP_CALL cchp_last_error(void) {
     try { return last_error; }
