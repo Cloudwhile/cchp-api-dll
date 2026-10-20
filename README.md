@@ -3,7 +3,7 @@
 面向 Windows 的 CCHP 原生 DLL SDK，提供账户查询、用量统计、状态快照和实时事件订阅。适用于 C/C++、易语言、Delphi，以及支持 C ABI 的其他宿主。
 
 > [!WARNING]
-> 管理员权限 Token 相关功能尚未验证：开发者不具备相应权限，相关实现基于源码复刻。接口尚不稳定，可能随上游变更而调整。
+> 管理员权限 Token 相关功能尚未验证。接口尚不稳定，可能随上游变更而调整。
 
 - 发布文件：`CCHPNetwork.dll`、`CCHPNetwork.lib`、`CCHPNetwork.def`、`cchp.h`
 - 支持架构：x64、x86（Win32）
