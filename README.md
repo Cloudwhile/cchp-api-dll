@@ -5,7 +5,7 @@
 > [!WARNING]
 > 管理员权限 Token 相关功能尚未验证。接口尚不稳定，可能随上游变更而调整。
 
-- 发布文件：`CCHPNetwork.dll`、`CCHPNetwork.lib`、`CCHPNetwork.def`、`cchp.h`
+- 发布文件：`CCHPNetwork.x64.dll` / `CCHPNetwork.x86.dll`，以及对应导入库、导出清单和 `cchp.h`
 - 支持架构：x64、x86（Win32）
 - 接口格式：UTF-8 JSON；x86 使用 `stdcall`，函数名无修饰
 - 运行依赖：Windows 系统组件；Release 静态链接 CRT
@@ -14,19 +14,19 @@
 
 ### 使用发布包
 
-选择与宿主架构一致的包，解压后将 `CCHPNetwork.dll` 放在可执行文件同目录。C/C++ 项目添加 `cchp.h` 的包含路径，并链接对应的 `CCHPNetwork.lib`。
+选择与宿主架构一致的包，解压后将 DLL 放在可执行文件同目录。x64 使用 `CCHPNetwork.x64.dll`，x86 使用 `CCHPNetwork.x86.dll`。C/C++ 项目添加 `cchp.h` 的包含路径，并链接同名 `.lib` 导入库。
 
 | 文件 | 用途 |
 | --- | --- |
-| `CCHPNetwork.dll` | 运行时库 |
-| `CCHPNetwork.lib` | MSVC 导入库 |
-| `CCHPNetwork.def` | 导出名称清单 |
+| `CCHPNetwork.x64.dll` / `CCHPNetwork.x86.dll` | 运行时库 |
+| `CCHPNetwork.x64.lib` / `CCHPNetwork.x86.lib` | MSVC 导入库 |
+| `CCHPNetwork.x64.def` / `CCHPNetwork.x86.def` | 导出名称清单 |
 | `cchp.h` | 公共 C 头文件 |
 | `cchp_status.exe` | 使用配置文件查询状态的 C 示例 |
-| `e-language-x86.txt` | 易语言 x86 DLL 声明 |
+| `e-language-x86.txt` | 易语言 DLL 声明，仅 x86 包提供 |
 | `SHA256SUMS.txt` | 包内文件的 SHA-256 校验值 |
 
-DLL 文件名已统一为 `CCHPNetwork`；公共头文件与 `cchp_*` 函数名保持兼容。现有宿主需更新 DLL 路径和导入库后重新链接。
+公共头文件与 `cchp_*` 函数名保持兼容。现有宿主需更新 DLL 路径和导入库后重新链接；请保留发布包中的架构后缀。
 
 ### 查询状态
 
@@ -236,7 +236,7 @@ powershell -NoProfile -ExecutionPolicy RemoteSigned -File scripts/build.ps1 -Mod
 powershell -NoProfile -ExecutionPolicy RemoteSigned -File scripts/build.ps1 -Mode Asan
 ```
 
-产物位于 `dist/x64/`、`dist/x86/`，压缩包为 `CCHPNetwork-x64.zip`、`CCHPNetwork-x86.zip`。CMake 构建目录统一位于 `out/build/`。
+发布包位于 `dist/CCHPNetwork-x64.zip`、`dist/CCHPNetwork-x86.zip`，DLL、导入库和导出清单均带对应的 `.x64` / `.x86` 后缀。打包使用独立的 `out/build/x64-package/`、`out/build/x86-package/` 构建目录；暂存文件位于 `out/package/`。普通 VS/CMake 构建输出仍为 `CCHPNetwork.dll`，可通过 CMake 选项 `-DCCHP_ARCH_SUFFIX=ON` 生成带架构后缀的文件。
 
 在 VS Developer Command Prompt 中也可直接运行：
 
@@ -260,7 +260,7 @@ third_party/   JSON 库及许可证
 
 ## 测试与兼容性
 
-自动测试使用本机 mock，覆盖鉴权、MFA、CSRF、分页和 null 字段、金额换算、SSE 重连及回收、纯 C 全导出调用和示例。Release 与分析构建还校验 PE 架构、头文件/导出表一致性和系统 DLL 依赖。ASan 构建仅用于验证，不作为发布包。
+自动测试使用本机 mock，覆盖鉴权、MFA、CSRF、分页和 null 字段、金额换算、SSE 重连及回收、纯 C 全导出调用和示例。Release 与分析构建还校验 PE 架构、头文件/导出表一致性、系统 DLL 依赖、导入库指向及示例加载。ASan 构建仅用于验证，不作为发布包。
 
 Release 的 DLL 依赖为 `WINHTTP.dll`、`RPCRT4.dll`、`KERNEL32.dll`。CI 分别运行 x64/x86 的 Release、Analyze、Asan 构建。
 

@@ -1,4 +1,4 @@
-LIBRARY CCHPNetwork
+LIBRARY CCHPNetwork.dll
 EXPORTS
   cchp_client_create
   cchp_client_destroy
