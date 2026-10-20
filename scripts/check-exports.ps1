@@ -7,7 +7,7 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 if (-not $Header) { $Header = Join-Path $PSScriptRoot '../include/cchp.h' }
-if (-not $Definition) { $Definition = Join-Path $PSScriptRoot '../cchp-api-dll/cchp.def' }
+if (-not $Definition) { $Definition = Join-Path $PSScriptRoot '../cchp-api-dll/CCHPNetwork.def' }
 $headerText = Get-Content -LiteralPath $Header -Raw
 $declared = @([regex]::Matches($headerText, 'CCHP_API\s+[^;\r\n]+?\s+CCHP_CALL\s+(cchp_\w+)\s*\(') |
     ForEach-Object { $_.Groups[1].Value } | Sort-Object)

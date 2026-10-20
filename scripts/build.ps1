@@ -25,7 +25,7 @@ try {
         & $env:ComSpec /d /c $command
         if ($LASTEXITCODE) { throw "$arch $Mode build or tests failed" }
         if ($Mode -eq 'Release') {
-            $checkCommand = 'chcp 65001 >nul && "{0}" {1} >nul && powershell -NoProfile -ExecutionPolicy RemoteSigned -File scripts/check-exports.ps1 -Dll "{2}/cchp.dll" -Architecture {1}' -f $vcvars, $arch, $buildDir
+            $checkCommand = 'chcp 65001 >nul && "{0}" {1} >nul && powershell -NoProfile -ExecutionPolicy RemoteSigned -File scripts/check-exports.ps1 -Dll "{2}/CCHPNetwork.dll" -Architecture {1}' -f $vcvars, $arch, $buildDir
             & $env:ComSpec /d /c $checkCommand
             if ($LASTEXITCODE) { throw 'Export/dependency validation failed' }
             if (-not $SkipVisualStudio) {
@@ -35,7 +35,11 @@ try {
             if ($Package) {
                 $destination = "dist/$arch"
                 New-Item -ItemType Directory -Force -Path $destination | Out-Null
-                foreach ($file in @('cchp.dll','cchp.lib','cchp.def','cchp_status.exe')) {
+                foreach ($legacy in @('cchp.dll','cchp.lib','cchp.def')) {
+                    $legacyPath = Join-Path $destination $legacy
+                    if (Test-Path -LiteralPath $legacyPath) { Remove-Item -LiteralPath $legacyPath -Force }
+                }
+                foreach ($file in @('CCHPNetwork.dll','CCHPNetwork.lib','CCHPNetwork.def','cchp_status.exe')) {
                     Copy-Item -LiteralPath "$buildDir/$file" -Destination $destination -Force
                 }
                 Copy-Item -LiteralPath include/cchp.h,README.md -Destination $destination -Force
@@ -50,7 +54,7 @@ try {
                         $_.FullName.Substring($packageRoot.Length + 1).Replace('\','/')
                     }
                 $checksums | Set-Content -LiteralPath "$destination/SHA256SUMS.txt" -Encoding ascii
-                Compress-Archive -Path "$destination/*" -DestinationPath "dist/cchp-$arch.zip" -Force
+                Compress-Archive -Path "$destination/*" -DestinationPath "dist/CCHPNetwork-$arch.zip" -Force
             }
         }
     }

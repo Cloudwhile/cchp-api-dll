@@ -2,6 +2,6 @@
   <PropertyGroup>
     <OutDir>$(MSBuildThisFileDirectory)$(Platform)\$(Configuration)\</OutDir>
     <IntDir>$(MSBuildThisFileDirectory)$(Platform)\$(Configuration)\obj\$(MSBuildProjectName)\</IntDir>
-    <TargetName Condition="'$(MSBuildProjectName)'=='cchp-api-dll'">cchp</TargetName>
+    <TargetName Condition="'$(MSBuildProjectName)'=='cchp-api-dll'">CCHPNetwork</TargetName>
   </PropertyGroup>
 </Project>

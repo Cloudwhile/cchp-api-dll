@@ -1,22 +1,241 @@
-# CCHP 原生 DLL SDK
+﻿# CCHPNetwork
 
-Windows 原生 C++17 / WinHTTP SDK，通过纯 C ABI 提供 REST、用量状态快照和 SSE。所有字符串均为 UTF-8，x86 使用 stdcall、导出名称无修饰。Release 静态链接 CRT，构建不联网。
+面向 Windows 的 CCHP 原生 DLL SDK，提供账户查询、用量统计、状态快照和实时事件订阅。适用于 C/C++、易语言、Delphi，以及支持 C ABI 的其他宿主。
 
-## 构建与目录
+- 发布文件：`CCHPNetwork.dll`、`CCHPNetwork.lib`、`CCHPNetwork.def`、`cchp.h`
+- 支持架构：x64、x86（Win32）
+- 接口格式：UTF-8 JSON；x86 使用 `stdcall`，函数名无修饰
+- 运行依赖：Windows 系统组件；Release 静态链接 CRT
 
-安装 Visual Studio 2026 的“使用 C++ 的桌面开发”、v145、Windows SDK、CMake/Ninja；ASan 检查还需安装 C++ AddressSanitizer 组件。打开 `cchp-api-dll.slnx`，选择 Release 与 x64/x86 即可编译 DLL。SDK 源码在 `cchp-api-dll/`，公共头在 `include/`，测试、示例分别在 `tests/`、`examples/`。
+## 快速开始
+
+### 使用发布包
+
+选择与宿主架构一致的包，解压后将 `CCHPNetwork.dll` 放在可执行文件同目录。C/C++ 项目添加 `cchp.h` 的包含路径，并链接对应的 `CCHPNetwork.lib`。
+
+| 文件 | 用途 |
+| --- | --- |
+| `CCHPNetwork.dll` | 运行时库 |
+| `CCHPNetwork.lib` | MSVC 导入库 |
+| `CCHPNetwork.def` | 导出名称清单 |
+| `cchp.h` | 公共 C 头文件 |
+| `cchp_status.exe` | 使用配置文件查询状态的 C 示例 |
+| `e-language-x86.txt` | 易语言 x86 DLL 声明 |
+| `SHA256SUMS.txt` | 包内文件的 SHA-256 校验值 |
+
+DLL 文件名已统一为 `CCHPNetwork`；公共头文件与 `cchp_*` 函数名保持兼容。现有宿主需更新 DLL 路径和导入库后重新链接。
+
+### 查询状态
+
+准备 UTF-8、无 BOM 的 `config.json`。例如，使用自己的管理令牌：
+
+```json
+{
+  "base_url": "https://ccx.autobits.cc",
+  "auth": {
+    "type": "bearer",
+    "token": "<management-token>"
+  }
+}
+```
+
+运行示例：
 
 ```powershell
-# 同时构建并测试两种架构，构建原生 VS 解决方案并打包
+.\cchp_status.exe .\config.json
+```
+
+输出示意：
+
+```text
+Model: gpt-6.1-sol, last: gpt-6.1-sol@2026-10-20T15:59:59.000Z, ↑ 2880.3 tok/s ↓ 11.6 tok/s, balance: $0.14\$15.30
+```
+
+其中 `balance` 的前一个值为当日花费，后一个值为钱包余额。示例源码见 [examples/status.c](examples/status.c)。
+
+### C 接入示例
+
+```c
+#include "cchp.h"
+#include <stdio.h>
+
+int show_status(const char* config_json) {
+    cchp_client client = cchp_client_create(config_json);
+    if (!client) {
+        fprintf(stderr, "%s\n", cchp_last_error());
+        return 1;
+    }
+
+    char* status = cchp_status_snapshot(client);
+    if (!status) {
+        /* 先使用错误信息，再调用其他 SDK 函数。 */
+        fprintf(stderr, "%s\n", cchp_last_error());
+        cchp_client_destroy(client);
+        return 1;
+    }
+
+    puts(status);
+    cchp_string_free(status);
+    cchp_client_destroy(client);
+    return 0;
+}
+```
+
+## 鉴权
+
+客户端创建时选择一种策略。下面的值均为占位符，请使用本人有权限访问的账户和组织。
+
+### 管理令牌
+
+适用于服务端和自动化程序。请求携带 `Authorization: Bearer ...`，无需组织头。
+
+```json
+{
+  "auth": { "type": "bearer", "token": "<management-token>" },
+  "timeout_ms": 30000
+}
+```
+
+### 浏览器会话
+
+使用登录后的 Cookie 和组织 ID。SDK 自动发送组织头；写请求额外获取 CSRF 并附加 Origin 和 Idempotency-Key。
+
+```json
+{
+  "auth": {
+    "type": "cookie",
+    "cookie": "__Host-cch_session=<session>; cf_clearance=<clearance>",
+    "org_id": "<organization-id>"
+  }
+}
+```
+
+Cookie 属于会话凭据，请保存在本地受保护的位置。Cloudflare clearance 与浏览器/IP 关联，复制到 SDK 后仍可能收到非 JSON 403；SDK 会返回明确提示。
+
+### 邮箱与密码
+
+首次请求自动执行 CSRF、密码登录、可选 MFA 和账户查询，随后使用浏览器会话。未指定 `org_id` 时从账户信息推断默认组织。
+
+```json
+{
+  "auth": {
+    "type": "password",
+    "email": "<email>",
+    "password": "<password>",
+    "mfa": { "method": "totp", "code": "<one-time-code>" }
+  }
+}
+```
+
+`mfa` 可省略，method 支持 `totp`、`recovery_code`。服务端要求 MFA 但配置缺少验证码时，返回 `status=202, code=-7`，请补充配置后重新创建客户端。账户安全和恢复码接口需要浏览器会话。
+
+所有策略均支持可选的 `base_url`（默认 `https://ccx.autobits.cc`）和 `timeout_ms`（默认 30000，范围 100～300000）。
+
+## API
+
+完整签名及参数约定见 [include/cchp.h](include/cchp.h)。
+
+| 函数 | 用途 |
+| --- | --- |
+| `cchp_client_create` / `cchp_client_destroy` | 创建、销毁客户端 |
+| `cchp_request` | 调用 `/api/` 下的通用 REST 接口 |
+| `cchp_get_me` | 当前账户 |
+| `cchp_usage_logs` | 用量日志；响应行位于 `page.items` |
+| `cchp_usage_summary` | 用量汇总 |
+| `cchp_usage_by_model` / `cchp_usage_timeseries` | 按模型、时间汇总 |
+| `cchp_wallet_overview` | 钱包余额和套餐 |
+| `cchp_quota_effective` | 查询有效额度；必填 `scopeType`、`scopeId` |
+| `cchp_status_snapshot` | 组合状态快照 |
+| `cchp_subscribe` / `cchp_unsubscribe` | 订阅、取消 SSE |
+| `cchp_string_free` | 释放返回的 JSON 字符串 |
+| `cchp_last_error` | 读取当前线程的错误 JSON |
+
+`query_json` 是 JSON 对象，参数自动 URL 编码，NULL 表示无参数。时间参数使用 RFC3339 UTC；logs 的 `limit` 为 1～200。分页读取 `page.nextCursor`，直到 null。解析容忍未知字段，进行中日志的 tokens、status、completedAt 可以为 null。
+
+通用接口示例：
+
+```c
+char* response = cchp_request(client, "GET",
+    "/api/account/finance-events", "{\"limit\":50}", NULL);
+if (response) {
+    puts(response);
+    cchp_string_free(response);
+}
+```
+
+组织管理接口属于 spec-only，实站可能返回 404。接口覆盖和验证来源见 [冒烟清单](docs/smoke-matrix.md)。
+
+### 状态快照
+
+| 字段 | 计算口径 |
+| --- | --- |
+| `nowActiveModel` | 最近 120 秒内最新日志的模型，否则 null |
+| `lastModel` / `lastActiveAt` | 最近日志，包含未完成行；无近期记录时向前查 30 天 |
+| `inputTokPerSec` / `outputTokPerSec` | 最近 300 秒全部日志的 token 总和除以 300，null tokens 按 0 处理 |
+| `todayCostUsd` | `summary.today.costUnits / 10^10` |
+| `balanceUsd` | `wallet.balanceUnits / 10^10` |
+
+模型优先使用 finalModel，缺失时使用 requestedModel。快照遍历窗口内全部游标页，按日志 ID 去重。金额使用 64 位整数解析后换算为美元，例如 `153017766000` units 对应 `$15.3017766`。查询失败会返回错误，403 不转换为空数据。
+
+### SSE
+
+stream 支持 `realtime`、`metrics`；types 是逗号分隔的事件类型，NULL 为默认。工作线程回调的数据格式如下：
+
+```json
+{"event":"usage_log_created","id":"event-id","data":{"logId":"log-id"}}
+```
+
+SDK 处理跨分块 UTF-8、CRLF、多行 data 和心跳，重连携带 Last-Event-ID。网络及可重试 HTTP 错误使用最高 30 秒退避。`sdk_error` 事件的 data 包含 status、code、message、terminal；terminal=true 表示订阅已停止，仍需取消或销毁以回收资源。
+
+## 内存、线程与错误处理
+
+- 返回的 `char*` 必须由 `cchp_string_free` 释放一次，不可使用宿主的 free/delete。
+- `cchp_last_error` 返回线程内借用的指针，无需释放；同线程下一次 SDK 调用会更新它。
+- SSE 事件字符串仅在回调期间有效，需保留时复制。UI 更新由宿主投递到 UI 线程。
+- subscribe、unsubscribe、destroy 不可在 SDK 回调内调用，会返回 code=-8。请由宿主线程操作。
+- unsubscribe/destroy 返回时，相关回调已经结束。卸载 DLL 前销毁全部客户端；销毁前停止其他线程继续使用句柄。
+- 同一客户端的 REST 请求串行执行。需要独立并行请求时可创建多个客户端。
+
+失败返回 NULL（subscribe 返回 0），错误格式为 `{"status":403,"code":10004,"message":"..."}`。服务端 HTTP status 和业务 code 保持原值。
+
+| SDK code | 含义 |
+| --- | --- |
+| -1 / -2 | 参数或句柄无效 / 内部异常 |
+| -3 / -4 / -5 | WinHTTP 失败 / 响应格式无效 / 非 JSON 403 |
+| -6 / -7 | 会话上下文缺失 / 需要 MFA |
+| -8 / -9 | 回调内生命周期操作 / 请求取消或客户端关闭 |
+
+GET 最多自动重试 3 次（100/200/400ms），仅重试网络错误和 408/429/500/502/503/504。写操作执行一次，并携带 UUID Idempotency-Key。HTTPS 使用系统证书与代理，重定向禁用。
+
+## 从源码构建
+
+需要 Visual Studio 2026 的 C++ 桌面开发组件、v145、Windows SDK、CMake 和 Ninja。ASan 验证另需 C++ AddressSanitizer 组件。nlohmann/json 3.11.3 已随仓库提供，构建无需下载依赖。
+
+### Visual Studio
+
+打开 `cchp-api-dll.slnx`，选择 Release 和 x64/x86。输出分别位于：
+
+```text
+x64/Release/CCHPNetwork.dll
+Win32/Release/CCHPNetwork.dll
+```
+
+### 构建脚本
+
+在仓库根目录运行：
+
+```powershell
+# 双架构构建、测试、原生 VS 构建和打包
 powershell -NoProfile -ExecutionPolicy RemoteSigned -File scripts/build.ps1 -Package
-# 分开的分析与 ASan 构建，均运行测试和 C 示例
+
+# 静态分析、AddressSanitizer（分开构建）
 powershell -NoProfile -ExecutionPolicy RemoteSigned -File scripts/build.ps1 -Mode Analyze
 powershell -NoProfile -ExecutionPolicy RemoteSigned -File scripts/build.ps1 -Mode Asan
 ```
 
-VS 输出：`x64/Release/cchp.dll`、`Win32/Release/cchp.dll`；中间文件位于同一目录的 `obj/`。CMake 验证构建集中在 `out/build/<架构>-<模式>/`。交付文件集中在 `dist/x64/`、`dist/x86/`，并提供 `dist/cchp-x64.zip`、`dist/cchp-x86.zip` 和 SHA256 清单。目录中的 `.lib` 是导入库，必须与宿主架构匹配。
+产物位于 `dist/x64/`、`dist/x86/`，压缩包为 `CCHPNetwork-x64.zip`、`CCHPNetwork-x86.zip`。CMake 构建目录统一位于 `out/build/`。
 
-也可在 VS Developer Command Prompt 中直接运行：
+在 VS Developer Command Prompt 中也可直接运行：
 
 ```bat
 cmake -S . -B out/build/manual -G Ninja -DCMAKE_BUILD_TYPE=Release
@@ -24,102 +243,26 @@ cmake --build out/build/manual --parallel
 ctest --test-dir out/build/manual --output-on-failure
 ```
 
-`CCHP_ANALYZE=ON` 和 `CCHP_ASAN=ON` 必须分开配置。第三方 JSON 为 vendored nlohmann/json 3.11.3，许可证位于 `third_party/nlohmann/`。
-
-## 鉴权配置
-
-以下均为占位符。配置文件使用 UTF-8、无 BOM，不要提交真实凭据。
-
-浏览器会话：每次请求自动带组织头；写请求先从 account/me 获取 CSRF，并带 Origin 与 UUID Idempotency-Key。
-
-```json
-{"base_url":"https://ccx.autobits.cc","auth":{"type":"cookie","cookie":"__Host-cch_session=<session>; cf_clearance=<clearance>","org_id":"<organization-id>"}}
-```
-
-管理令牌：自动带 Bearer，不发送组织头。账号安全和恢复码操作须使用浏览器会话。
-
-```json
-{"auth":{"type":"bearer","token":"<management-token>"},"timeout_ms":30000}
-```
-
-密码登录：第一次请求时依次执行 csrf、password、可选 MFA、account/me；合并 Set-Cookie，按 activeOrganizationId、memberships 或 organizations 推断组织。可用 org_id 显式指定。MFA 尚未提供时返回 status=202、code=-7，重新用包含 MFA 的配置创建客户端。
-
-```json
-{"auth":{"type":"password","email":"<email>","password":"<password>","org_id":"<organization-id>","mfa":{"method":"totp","code":"<one-time-code>"}}}
-```
-
-`mfa` 和 `org_id` 可省略；MFA method 支持 `totp`、`recovery_code`。`timeout_ms` 范围 100..300000。HTTPS 使用系统证书校验和代理；HTTP 仅允许 loopback 测试。Cloudflare clearance 与浏览器/IP 绑定，非 JSON 403 会返回明确的 Cloudflare 提示。
-
-## C 调用
-
-```c
-#include "cchp.h"
-/* config_json 由宿主从安全配置读取 */
-cchp_client client = cchp_client_create(config_json);
-if (client) {
-    char* value = cchp_status_snapshot(client);
-    if (value) {
-        puts(value);
-        cchp_string_free(value);
-    } else {
-        fprintf(stderr, "%s\n", cchp_last_error());
-    }
-    cchp_client_destroy(client);
-}
-```
-
-链接匹配架构的 `cchp.lib`，将 `cchp.dll` 放到程序目录。纯 C 示例 `examples/status.c` 构建为 `cchp_status.exe`，运行 `cchp_status config.json`，输出模型、最近时间、窗口 tok/s、当日花费和余额的一行状态。该示例使用独立配置文件，最大 8191 字节。易语言 x86 声明见 `examples/e-language-x86.txt`，指针使用整数型并在宿主侧转换 UTF-8。
-
-便捷接口：`cchp_get_me`、`cchp_usage_logs`、`cchp_usage_summary`、`cchp_usage_by_model`、`cchp_usage_timeseries`、`cchp_wallet_overview`、`cchp_quota_effective`、`cchp_status_snapshot`。参数和返回值见 `include/cchp.h`。query_json 是对象，自动 URL 编码；无参数时传 NULL。quota 必填 scopeType（user/org/key）和 scopeId。logs limit 为 1..200，时间使用 RFC3339 UTC，游标从 `page.nextCursor` 取，直至 null。未知字段保留，`$schema` 不参与业务处理，进行中行的 tokens/status/completedAt 可为 null。
-
-其他接口用通用入口，例如：
-
-```c
-char* identity = cchp_request(client, "GET", "/api/admin/whoami", NULL, NULL);
-char* permissions = cchp_request(client, "GET", "/api/account/permissions/summary", NULL, NULL);
-char* finance = cchp_request(client, "GET", "/api/account/finance-events", "{\"limit\":50}", NULL);
-/* 分别检查 NULL，成功结果均调用 cchp_string_free。 */
-```
-
-组织列表及组织管理接口为 spec-only；`/api/account/orgs` 已知实站返回纯文本 404。详细接口状态见 [冒烟清单](docs/smoke-matrix.md)。
-
-## 快照口径
-
-`nowActiveModel`：最近 120 秒内最新日志的 finalModel（缺失时用 requestedModel），否则 null。`lastModel` / `lastActiveAt` 包含未完成行，最近 300 秒无日志时向前查 30 天。`lastActiveAt` 保留服务端 RFC3339 时间。input/outputTokPerSec 为最近 300 秒日志 token 总和除以 300，遍历全部游标页并对行 ID 去重；null tokens 按 0 处理。summary.today.costUnits 和 wallet.balanceUnits 均以 int64_t 解析，再除以 `10000000000.0`。`153017766000` units 得到 `$15.3017766`。无日志时模型和时间为 null，速率为 0；403 等错误直接使快照失败。
-
-## SSE、内存与线程
-
-`cchp_subscribe(client,"realtime",types,callback,user_data)` 或 `"metrics"` 返回 uint32_t ID，0 为失败。types 是逗号分隔的类型名，NULL 为默认。回调接收 `{"event":"usage_log_created","id":"...","data":{...}}`；心跳也正常转发。网络错误和可重试 HTTP 状态触发 0.5 秒至 30 秒指数退避，遵循服务端 retry，重连发送 Last-Event-ID。空闲流持续等待数据，不因 REST 超时而重连。
-
-回调在 DLL 工作线程上执行。事件字符串仅在回调期间有效，宿主需要复制；user_data 由宿主管理，取消/销毁返回后才能释放。UI 更新应投递到 UI 线程。`sdk_error` 事件的 data 含 status/code/message/terminal；不可重试错误停止该订阅，宿主仍应取消或销毁以回收资源。宿主回调不能抛异常，DLL 会隔离异常并停止订阅。
-
-禁止在任何 SDK 回调中调用 subscribe、unsubscribe、destroy：返回 code=-8，句柄和订阅保留供宿主线程随后释放。外部线程 unsubscribe/destroy 会取消网络读取并 join；返回时相关回调均已结束。销毁前宿主应停止其他线程继续访问句柄；卸载 DLL 前必须销毁全部客户端。DllMain 不做网络、创建线程或线程回收。
-
-普通请求在同一客户端内串行以保护登录/Cookie/CSRF 状态；可创建多个客户端独立并行。全部 FFI 边界用 /EHa 和 catch 隔离 C++ 异常与 SEH。输入指针必须有效，返回字符串只能调用 `cchp_string_free` 一次；不得用宿主 CRT 的 free/delete。`cchp_last_error()` 返回同线程借用的 JSON 指针，无需释放，有效到该线程下一次 SDK 调用；应在释放其他字符串前复制错误。
-
-错误 JSON 包含 status、code、message。服务端业务 code 与 HTTP status 原样保留；任意服务端 detail 不直接回显。SDK code：-1 参数/句柄，-2 内部异常，-3 WinHTTP，-4 响应格式，-5 Cloudflare，-6 会话上下文，-7 MFA，-8 回调生命周期，-9 取消/关闭。成功调用清除线程错误。日志脱敏覆盖 cookie/set-cookie/authorization/password/token/*_token；SDK 不输出原始网络响应或凭据日志。
-
-只有 GET 自动重试，最多 3 次，退避为 100/200/400ms；408/429/500/502/503/504 或网络错误可重试。写操作只执行一次并发送 Idempotency-Key。重定向被禁用，不把凭据发送到另一个地址。
-
-## 验证记录
-
-本次验证均为本地脱敏 mock，无真实生产认证调用。任务书的既有实测事实与本次 mock 结果分开列在冒烟清单中。
-
-| 构建 | x64 | x86 |
-| --- | --- | --- |
-| MSVC Release | 7/7 | 7/7 |
-| MSVC /analyze | 7/7 | 7/7 |
-| MSVC ASan | 6/6 | 6/6 |
-| 原生 VS2026 Release | 已构建 | 已构建 |
-
-测试包括三种鉴权、MFA、CSRF/Cookie、403、重试、UTF-8 查询、分页与空值、units 换算、30 天兜底、SSE parser/reconnect/空闲取消、回调生命周期、TLS 错误，以及从纯 C 编译并调用全部导出符号的完整流程。C 示例也在 ASan 下运行。ASan 构建额外依赖本机 sanitizer runtime，仅供验证，不用于交付。
-
-Release 的 `dumpbin /dependents`（x86 / x64 一致）：
+### 项目结构
 
 ```text
-WINHTTP.dll
-RPCRT4.dll
-KERNEL32.dll
+cchp-api-dll/   SDK 实现和模块定义
+include/       公共 C 头文件
+tests/         契约、ABI、SSE 与用量测试
+examples/      C 示例和易语言声明
+scripts/       构建、打包和 PE 导出检查
+docs/          接口冒烟清单
+third_party/   JSON 库及许可证
 ```
 
-`scripts/check-exports.ps1` 自动比较头文件、.def 与实际 PE 导出，核对架构并限制为系统 DLL 依赖。CI 对两架构分别运行 Release、分析、ASan 并上传 Release 包。未运行远程 CI 时不代表已通过 GitHub 构建。
+## 测试与兼容性
+
+自动测试使用本机 mock，覆盖鉴权、MFA、CSRF、分页和 null 字段、金额换算、SSE 重连及回收、纯 C 全导出调用和示例。Release 与分析构建还校验 PE 架构、头文件/导出表一致性和系统 DLL 依赖。ASan 构建仅用于验证，不作为发布包。
+
+Release 的 DLL 依赖为 `WINHTTP.dll`、`RPCRT4.dll`、`KERNEL32.dll`。CI 分别运行 x64/x86 的 Release、Analyze、Asan 构建。
+
+本地 mock 通过不代表真实站点的凭据、权限或 Cloudflare 状态已验证。既有实测事实与本次自动测试范围见 [冒烟清单](docs/smoke-matrix.md)。
+
+## 许可证
+
+项目许可证为 [GNU AGPL v3](LICENSE.txt)。nlohmann/json 使用 MIT 许可证，见 [第三方许可](third_party/nlohmann/LICENSE.MIT)。

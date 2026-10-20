@@ -15,7 +15,7 @@
       <EnableASAN Condition="'$(CchpAsan)'=='true'">true</EnableASAN>
     </ClCompile>
     <Link>
-      <ModuleDefinitionFile>$(MSBuildThisFileDirectory)cchp-api-dll\cchp.def</ModuleDefinitionFile>
+      <ModuleDefinitionFile>$(MSBuildThisFileDirectory)cchp-api-dll\CCHPNetwork.def</ModuleDefinitionFile>
       <AdditionalDependencies>winhttp.lib;rpcrt4.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
@@ -33,6 +33,6 @@
     <ClInclude Include="$(MSBuildProjectDirectory)\usage.hpp" />
     <ClInclude Include="$(MSBuildProjectDirectory)\sse.hpp" />
     <ClInclude Include="$(MSBuildThisFileDirectory)include\cchp.h" />
-    <None Include="$(MSBuildProjectDirectory)\cchp.def" />
+    <None Include="$(MSBuildProjectDirectory)\CCHPNetwork.def" />
   </ItemGroup>
 </Project>

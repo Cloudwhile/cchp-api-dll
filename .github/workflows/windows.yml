@@ -16,5 +16,5 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: matrix.mode == 'Release'
         with:
-          name: cchp-${{ matrix.architecture }}
-          path: dist/cchp-${{ matrix.architecture }}.zip
+          name: CCHPNetwork-${{ matrix.architecture }}
+          path: dist/CCHPNetwork-${{ matrix.architecture }}.zip
