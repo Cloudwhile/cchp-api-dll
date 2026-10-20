@@ -1,0 +1,36 @@
+#ifndef CCHP_H
+#define CCHP_H
+
+/* 所有字符串均为 UTF-8、NUL 结尾，输入仅在调用期间借用。
+ * 配置与所有 JSON 对象均允许未知字段。
+ * 本 DLL 使用静态 CRT。返回的 char* 必须由 cchp_string_free 释放，
+ * 禁止在宿主中使用 free/delete。句柄必须由 cchp_client_destroy 释放。
+ */
+#include <stdint.h>
+#if defined(_WIN32)
+#define CCHP_CALL __stdcall
+#if defined(CCHP_BUILD)
+#define CCHP_API
+#else
+#define CCHP_API __declspec(dllimport)
+#endif
+#else
+#define CCHP_CALL
+#define CCHP_API
+#endif
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+typedef void* cchp_client;
+CCHP_API cchp_client CCHP_CALL cchp_client_create(const char* config_json);
+CCHP_API void CCHP_CALL cchp_client_destroy(cchp_client client);
+CCHP_API void CCHP_CALL cchp_string_free(char* string);
+/* 线程本地错误 JSON：{status,code,message}。无需释放；有效至同一线程
+ * 下一次 SDK 调用（重复调用 last_error 除外）。成功调用清除旧错误。 */
+CCHP_API const char* CCHP_CALL cchp_last_error(void);
+
+#ifdef __cplusplus
+}
+#endif
+#endif
