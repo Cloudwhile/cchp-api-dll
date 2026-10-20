@@ -23,4 +23,5 @@ public:
     int count(const std::string& route);
     std::atomic<int> usage_mode{0}; // 0=recent, 1=30-day fallback, 2=empty, 3=forbidden, 4=cursor loop
     std::int64_t now = 0;
+    std::atomic<int> sse_resumed{0};
 };

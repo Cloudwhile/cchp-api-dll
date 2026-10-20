@@ -106,7 +106,29 @@ void MockServer::serve(SOCKET socket) {
     Json result = Json::object();
     std::string text;
     const auto payload = body.empty() ? Json::object() : Json::parse(body, nullptr, false);
-    if (path == "/api/auth/csrf") {
+    if (path == "/api/account/usage/realtime" || path == "/api/account/metrics/stream") {
+        if (headers["authorization"] != "Bearer test-only" || headers["accept"] != "text/event-stream") {
+            send_all(socket, "HTTP/1.1 403 Fixture\r\nContent-Type: application/json\r\nContent-Length: 14\r\n\r\n{\"code\":10004}");
+            return;
+        }
+        send_all(socket, "HTTP/1.1 200 Fixture\r\nContent-Type: text/event-stream\r\nConnection: close\r\n\r\n");
+        if (headers["last-event-id"] == "evt-1") {
+            ++sse_resumed;
+            send_all(socket, "id: evt-2\nevent: usage_log_updated\ndata: {\"resumed\":true}\n\n");
+        } else if (path == "/api/account/metrics/stream") {
+            send_all(socket, "event: scope\ndata: {\"organizationId\":\"fixture-org\"}\n\n");
+        } else {
+            const std::string frame = "retry: 100\r\nid: evt-1\r\nevent: usage_log_created\r\ndata: {\"model\":\"中文\",\r\ndata: \"tokens\":1}\r\n\r\n";
+            for (char c : frame) if (!send_all(socket, std::string(1, c))) return;
+            return; // Force a real reconnect with Last-Event-ID.
+        }
+        // Stay idle until client cancellation closes the socket.
+        while (!stopping_) {
+            const auto received = recv(socket, buffer.data(), 1, 0);
+            if (received == 0 || (received == SOCKET_ERROR && WSAGetLastError() != WSAETIMEDOUT)) return;
+        }
+        return;
+    } else if (path == "/api/auth/csrf") {
         result = {{"csrf_token", "preauth-fixture"}};
         extra = "Set-Cookie: __Host-cch_preauth=pre=a; Path=/; HttpOnly\r\n";
     } else if (path == "/api/auth/sign-in/password") {

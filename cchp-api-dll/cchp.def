@@ -13,3 +13,5 @@ EXPORTS
   cchp_wallet_overview
   cchp_quota_effective
   cchp_status_snapshot
+  cchp_subscribe
+  cchp_unsubscribe

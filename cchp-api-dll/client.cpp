@@ -1,4 +1,5 @@
 #include "http.hpp"
+#include "sse.hpp"
 #include <rpc.h>
 #include <chrono>
 #include <sstream>
@@ -29,7 +30,7 @@ Client::Client(Config value) : config(std::move(value)) {
     while (std::getline(stream, pair, ';')) merge_cookies({trim(pair)});
     authenticated_ = config.auth_type != "password";
 }
-Client::~Client() = default;
+Client::~Client() { shutdown(); }
 void Client::merge_cookies(const std::vector<std::string>& cookies) {
     for (const auto& raw : cookies) {
         const auto end = raw.find(';'), equal = raw.find('=');

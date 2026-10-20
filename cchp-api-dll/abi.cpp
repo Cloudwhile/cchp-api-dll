@@ -51,6 +51,7 @@ cchp_client CCHP_CALL cchp_client_create(const char* config_json) {
 void CCHP_CALL cchp_client_destroy(cchp_client client) {
     try {
         clear_error();
+        get_client(client)->shutdown();
         std::shared_ptr<cchp::Client> removed;
         {
             std::lock_guard<std::mutex> lock(clients_mutex);
@@ -116,6 +117,18 @@ char* CCHP_CALL cchp_quota_effective(cchp_client client, const char* query_json)
 char* CCHP_CALL cchp_status_snapshot(cchp_client client) {
     try { clear_error(); return allocated(get_client(client)->snapshot()); }
     catch (...) { caught_error(); return nullptr; }
+}
+uint32_t CCHP_CALL cchp_subscribe(cchp_client client, const char* stream, const char* types,
+                                cchp_event_callback callback, void* user_data) {
+    try {
+        clear_error();
+        if (!stream) throw cchp::Error(0, -1, "stream is required");
+        return get_client(client)->subscribe(stream, types ? types : "", callback, user_data);
+    } catch (...) { caught_error(); return 0; }
+}
+void CCHP_CALL cchp_unsubscribe(cchp_client client, uint32_t sub_id) {
+    try { clear_error(); get_client(client)->unsubscribe(sub_id); }
+    catch (...) { caught_error(); }
 }
 const char* CCHP_CALL cchp_last_error(void) {
     try { return last_error; }

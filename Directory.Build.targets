@@ -25,9 +25,11 @@
     <ClCompile Include="$(MSBuildProjectDirectory)\core.cpp" />
     <ClCompile Include="$(MSBuildProjectDirectory)\http.cpp" />
     <ClCompile Include="$(MSBuildProjectDirectory)\usage.cpp" />
+    <ClCompile Include="$(MSBuildProjectDirectory)\sse.cpp" />
     <ClInclude Include="$(MSBuildProjectDirectory)\core.hpp" />
     <ClInclude Include="$(MSBuildProjectDirectory)\http.hpp" />
     <ClInclude Include="$(MSBuildProjectDirectory)\usage.hpp" />
+    <ClInclude Include="$(MSBuildProjectDirectory)\sse.hpp" />
     <ClInclude Include="$(MSBuildThisFileDirectory)include\cchp.h" />
     <None Include="$(MSBuildProjectDirectory)\cchp.def" />
   </ItemGroup>

@@ -26,9 +26,16 @@ struct Config {
     static Config parse(const char* text);
 };
 class Transport;
+class Cancellation;
+class Subscription;
+using EventCallback = void (__stdcall *)(const char*, void*);
 struct Response;
 std::int64_t utc_now_ms();
 class Client {
+    std::mutex subscriptions_mutex_;
+    std::map<std::uint32_t, std::unique_ptr<Subscription>> subscriptions_;
+    std::uint32_t next_subscription_ = 1;
+    bool closing_ = false;
     std::unique_ptr<Transport> transport_;
     std::recursive_mutex auth_mutex_;
     std::map<std::string, std::string> cookies_;
@@ -45,5 +52,9 @@ public:
     Json request(const std::string& method, const std::string& path, const Json& query = Json::object(), const Json* body = nullptr);
     Json usage_logs(const Json& query);
     Json snapshot(std::int64_t now = utc_now_ms());
+    std::uint32_t subscribe(const std::string& stream, const std::string& types, EventCallback callback, void* user);
+    void unsubscribe(std::uint32_t id);
+    void shutdown();
+    Response open_stream(const std::string& path, const std::string& types, const std::string& last_id, Cancellation& cancel);
 };
 }

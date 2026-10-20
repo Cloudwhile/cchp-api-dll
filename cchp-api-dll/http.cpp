@@ -4,6 +4,22 @@
 #include <limits>
 
 namespace cchp {
+HINTERNET RequestHandle::get() {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (!handle_) throw Error(0, -9, "Request cancelled");
+    return handle_.get();
+}
+void RequestHandle::close() { std::lock_guard<std::mutex> lock(mutex_); handle_.reset(); }
+void Cancellation::attach(std::shared_ptr<RequestHandle> request) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    request_ = std::move(request);
+    if (stopped_) { request_->close(); throw Error(0, -9, "Request cancelled"); }
+}
+void Cancellation::stop() {
+    std::lock_guard<std::mutex> lock(mutex_);
+    stopped_ = true;
+    if (request_) request_->close();
+}
 namespace {
 [[noreturn]] void network_error() {
     const auto code = GetLastError();
@@ -83,7 +99,7 @@ Transport::Transport(const Config& config) {
     checked(WinHttpSetTimeouts(session_.get(), config.timeout_ms, config.timeout_ms, config.timeout_ms, config.timeout_ms));
 }
 Response Transport::open(const std::string& method, const std::string& path, const Json& query,
-                         const Headers& headers, const std::string& body) {
+                         const Headers& headers, const std::string& body, Cancellation* cancellation) {
     if (method != "GET" && method != "POST" && method != "PUT" && method != "DELETE" &&
         method != "PATCH" && method != "HEAD" && method != "OPTIONS") throw Error(0, -1, "Unsupported HTTP method");
     if ((path != "/api" && path.compare(0, 5, "/api/") != 0) || path.find_first_of("?#\\\r\n") != std::string::npos ||
@@ -92,16 +108,23 @@ Response Transport::open(const std::string& method, const std::string& path, con
     response.connection.reset(WinHttpConnect(session_.get(), host_.c_str(), port_, 0));
     if (!response.connection) network_error();
     const auto target = wide(path + query_string(query));
-    response.request.reset(WinHttpOpenRequest(response.connection.get(), wide(method).c_str(), target.c_str(), nullptr,
+    Internet opened(WinHttpOpenRequest(response.connection.get(), wide(method).c_str(), target.c_str(), nullptr,
         WINHTTP_NO_REFERER, WINHTTP_DEFAULT_ACCEPT_TYPES, secure_ ? WINHTTP_FLAG_SECURE : 0));
-    if (!response.request) network_error();
+    if (!opened) network_error();
+    response.request = std::make_shared<RequestHandle>(opened.get());
+    opened.release();
+    if (cancellation) {
+        cancellation->attach(response.request);
+        // An idle SSE stream is valid. Cancellation closes the request to wake reads.
+        checked(WinHttpSetTimeouts(response.request->get(), 30000, 30000, 30000, 0));
+    }
     DWORD disabled = WINHTTP_DISABLE_COOKIES;
-    checked(WinHttpSetOption(response.request.get(), WINHTTP_OPTION_DISABLE_FEATURE, &disabled, sizeof(disabled)));
+    checked(WinHttpSetOption(response.request->get(), WINHTTP_OPTION_DISABLE_FEATURE, &disabled, sizeof(disabled)));
     DWORD redirects = WINHTTP_OPTION_REDIRECT_POLICY_NEVER;
-    checked(WinHttpSetOption(response.request.get(), WINHTTP_OPTION_REDIRECT_POLICY, &redirects, sizeof(redirects)));
+    checked(WinHttpSetOption(response.request->get(), WINHTTP_OPTION_REDIRECT_POLICY, &redirects, sizeof(redirects)));
     DWORD logon = WINHTTP_AUTOLOGON_SECURITY_LEVEL_HIGH;
-    checked(WinHttpSetOption(response.request.get(), WINHTTP_OPTION_AUTOLOGON_POLICY, &logon, sizeof(logon)));
-    std::string all_headers = "Accept: application/json\r\n";
+    checked(WinHttpSetOption(response.request->get(), WINHTTP_OPTION_AUTOLOGON_POLICY, &logon, sizeof(logon)));
+    std::string all_headers = headers.count("Accept") ? "" : "Accept: application/json\r\n";
     if (!body.empty()) all_headers += "Content-Type: application/json; charset=utf-8\r\n";
     for (const auto& item : headers) {
         if (item.second.find_first_of("\r\n") != std::string::npos || item.second.find('\0') != std::string::npos)
@@ -110,17 +133,17 @@ Response Transport::open(const std::string& method, const std::string& path, con
     }
     if (body.size() > MAXDWORD) throw Error(0, -1, "Request body too large");
     const auto headers_w = wide(all_headers);
-    checked(WinHttpSendRequest(response.request.get(), headers_w.c_str(), static_cast<DWORD>(headers_w.size()),
+    checked(WinHttpSendRequest(response.request->get(), headers_w.c_str(), static_cast<DWORD>(headers_w.size()),
         body.empty() ? WINHTTP_NO_REQUEST_DATA : const_cast<char*>(body.data()), static_cast<DWORD>(body.size()), static_cast<DWORD>(body.size()), 0));
-    checked(WinHttpReceiveResponse(response.request.get(), nullptr));
+    checked(WinHttpReceiveResponse(response.request->get(), nullptr));
     DWORD status = 0, size = sizeof(status);
-    checked(WinHttpQueryHeaders(response.request.get(), WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER,
+    checked(WinHttpQueryHeaders(response.request->get(), WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER,
         WINHTTP_HEADER_NAME_BY_INDEX, &status, &size, WINHTTP_NO_HEADER_INDEX));
     response.status = static_cast<int>(status);
-    response.content_type = header(response.request.get(), WINHTTP_QUERY_CONTENT_TYPE);
+    response.content_type = header(response.request->get(), WINHTTP_QUERY_CONTENT_TYPE);
     DWORD index = 0;
     for (;;) {
-        auto cookie = header(response.request.get(), WINHTTP_QUERY_SET_COOKIE, &index);
+        auto cookie = header(response.request->get(), WINHTTP_QUERY_SET_COOKIE, &index);
         if (cookie.empty()) break;
         response.set_cookies.push_back(std::move(cookie));
     }
@@ -131,7 +154,7 @@ std::string Response::read_all() {
     std::array<char, 16384> buffer{};
     for (;;) {
         DWORD read = 0;
-        checked(WinHttpReadData(request.get(), buffer.data(), static_cast<DWORD>(buffer.size()), &read));
+        checked(WinHttpReadData(request->get(), buffer.data(), static_cast<DWORD>(buffer.size()), &read));
         if (!read) return text;
         if (text.size() + read > 64 * 1024 * 1024) throw Error(status, -4, "Response exceeds 64 MiB limit");
         text.append(buffer.data(), read);

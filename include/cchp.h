@@ -43,6 +43,18 @@ CCHP_API char* CCHP_CALL cchp_usage_timeseries(cchp_client client, const char* q
 CCHP_API char* CCHP_CALL cchp_wallet_overview(cchp_client client);
 CCHP_API char* CCHP_CALL cchp_quota_effective(cchp_client client, const char* query_json);
 CCHP_API char* CCHP_CALL cchp_status_snapshot(cchp_client client);
+/* stream: "realtime" 或 "metrics"；types: 逗号分隔的类型，NULL 为默认。
+ * 返回订阅 ID，失败为 0。事件 JSON: {event,id,data}；sdk_error 的 data
+ * 含 status/code/message/terminal。工作线程调用 callback，宿主自行切回 UI。
+ * event_json 仅在回调期间有效，需保留时请复制。user_data 由宿主管理。
+ * subscribe/unsubscribe/destroy 禁止在任何 SDK 回调内调用，返回错误 -8；
+ * 请通知宿主线程执行。unsubscribe/destroy 返回时所有相关回调均已结束。
+ * 销毁前宿主应停止其他线程继续使用该句柄，卸载 DLL 前必须销毁全部句柄。
+ */
+typedef void (CCHP_CALL *cchp_event_callback)(const char* event_json, void* user_data);
+CCHP_API uint32_t CCHP_CALL cchp_subscribe(cchp_client client, const char* stream,
+    const char* types, cchp_event_callback callback, void* user_data);
+CCHP_API void CCHP_CALL cchp_unsubscribe(cchp_client client, uint32_t sub_id);
 /* 线程本地错误 JSON：{status,code,message}。无需释放；有效至同一线程
  * 下一次 SDK 调用（重复调用 last_error 除外）。成功调用清除旧错误。 */
 CCHP_API const char* CCHP_CALL cchp_last_error(void);
